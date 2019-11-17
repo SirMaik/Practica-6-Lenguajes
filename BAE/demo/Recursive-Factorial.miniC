@@ -1,0 +1,5 @@
+//Example of a program of recursive factorial function.
+
+let fac := recurFn fac n => if n = 0 then 1 else n * (fac $ (pred n)) in
+    fac $ 5
+end :: Integer

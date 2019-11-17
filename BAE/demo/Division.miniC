@@ -1,0 +1,14 @@
+//Example of a program of iterative division function
+
+let division := fn m => fn n  => let q := alloc 0 in
+    	     	     	      	     let r := alloc m in
+				     	 (while ((!r > n) | (!r = n)) do
+					       q ::= !q + 1;
+					       r ::= !r + (n * (-1))
+					 end);
+					 !q
+			              end
+				  end
+in
+	division $ 64 $ 4
+end :: Integer

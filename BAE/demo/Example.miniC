@@ -1,0 +1,12 @@
+//Example of a program of Boolean-Arithmetic Expressions.
+
+let fnot := fn x => (not x) in
+  let x1 := (1 + 2) * (succ (pred 10)) in
+    let y := 1 = 1 in
+      if true & (x1 > -4) | false then
+        fnot $ (not y | (x1 < 31))
+      else
+        fnot $ (x1 < -4)
+    end
+  end
+end :: Boolean
