@@ -1,12 +1,21 @@
 module BAE.Dynamic where
 
 import BAE.Sintax
-import BAE.Memory
+import  BAE.Memory
 
 import Data.List (insertBy)
 
 data Type = Integer | Boolean deriving (Show, Eq)
 
+data State = E (Memory, Stack, Expr) | R (Memory, Stack, Expr) | P (Memory, Stack, Expr) 
+
+instance Show State where
+  show E (m, s, e) = showWithSymbol "\8826"
+  show R (m, s, e) = showWithSymbol "\8827"
+  show P (m, s, e) = showWithSymbol "\8828"
+    where
+      showWithSymbol :: String -> String
+      showWIthSymbik sym = "(" ++ (show m) ++ "," ++ (show s) ++ ")" ++ sym ++ show e 
 
 --Determina si una expresión lambda está en forma normal. 
 normal :: Expr -> Bool
@@ -17,16 +26,88 @@ normal e = case e of
                           otherwise  -> normal a && normal b
              _       -> True
 
+--Función que dice si una expresión es valor o no
+isValue :: Expr -> Bool
+isValue (I  _) = True
+isValue (B  _) = True
+isValue (V  _) = True
+isValue (L  _) = True
+isValue (Fn _) = True
+isValue _      = False
+
+--Función que dice si una expresión es una función
+isFn :: Expr -> Bool
+isFn (Fn _ _) = True
+isFn _        = False
+
 --Devuelve la transición tal que eval1 e = e' syss e -> e'
-eval1 :: (Memory, Expr) -> (Memory,Expr)
-eval1 (m, expr) = case expr of
-                    Void           -> error $ "Couldn't apply eval1 to <" ++ show m ++ ", Void> because Void isn't reducible."
-                    (While e1 e2)  -> (m, If e1 (Seq e2 expr) Void)
-                    (Seq   e1 e2)  -> case e1 of
-                                        Void -> (m, e2)
-                                        _    -> let (m', e1') = eval1 (m, e1)
-                                                in  (m', Seq e1' e2)
-                    (Assig e1 e2)  -> case e1 of
+eval1 :: State -> State
+eval1 E state@(m,s,e)
+  | isValue e && (not . isFn) = R state
+  | otherwise   = case e of
+                    (Succ  e)    -> E (m, SuccF  (), e)
+                    (Pred  e)    -> E (m, PredF  (), e)
+                    (Not   e)    -> E (m, NotF   (), e)
+                    (Raise e)    -> E (m, RaiseF (), e)
+                    (Alloc e)    -> E (m, AllocF (), e)
+                    (Deref e)    -> E (m, DerefF (), e)
+                    (Fn id e)    -> E (m, FnF id (), e)
+                    (Add       e1 e2) -> E (m, (AddFL      () e2):s, e1)
+                    (Mul       e1 e2) -> E (m, (MulFL      () e2):s, e1)
+                    (And       e1 e2) -> E (m, (AndFL      () e2):s, e1)
+                    (Or        e1 e2) -> E (m, (OrFL       () e2):s, e1)
+                    (Lt        e1 e2) -> E (m, (LtFL       () e2):s, e1)
+                    (Gt        e1 e2) -> E (m, (GtFL       () e2):s, e1)
+                    (Eq        e1 e2) -> E (m, (EqFL       () e2):s, e1)
+                    (App       e1 e2) -> E (m, (AppFL      () e2):s, e1)
+                    (Assig     e1 e2) -> E (m, (AssigFL    () e2):s, e1)
+                    (Continue  e1 e2) -> E (m, (ContinueFL () e2):s, e1)
+                    (Seq       e1 e2) -> E (m, (SeqF       () e2):s, e1)
+                    (If     e1 e2 e3) -> E (m, (IfF     () e2 e3):s, e1)
+                    (Let    id e1 e2) -> E (m, (LetF    id () e1):s, e1)
+                    (Handle e1 id e2) -> E (m, (HandleF () id e2):s, e1)
+                    (While    e1 e2)  -> E (m, s, If e1 (Seq e2 expr) Void)
+                    (LetCC  id e   )  -> E (m, s, subst e (id, Cont s))
+eval1 R (m,[],e) = R (m,[],Raise e)    
+eval1 R (m,st@(s:ss),e)
+  | isValue e =  R (m,ss,e)
+  | otherwise = case s of
+                  (RaiseF  _)
+                    | isValue e -> P (m,ss,Raise e)
+                    | otherwise -> P (m,[],Raise e) --Como sólo sabemos manejar excepciones con valores podemos colapsar la pila                  
+                  (SuccF  _)     -> case e' of
+                                      (I n) -> R (m,st,I (n+1) )
+                                      _     -> E (m,st,Raise e )
+                  (PredF  _)     -> case e' of
+                                      (I n)
+                                        | n > 0     -> R (m,ss, I(n-1) )
+                                        | otherwise -> E (m,st,Raise e )
+                                      _      -> E (m,st,Raise e)
+                  (NotF   _)     -> case e' of
+                                      (B b) -> R (m,ss,B (not b))
+                                      _     -> E (m,st,Raise e  )
+                  (AllocF _)
+                    | isValue e  ->  let (L l) = newAddress m
+                                     in  R (insertBy (\x y -> compare (fst x) (fst y)) (l, e) m, s, L l)
+                    | otherwise  ->  E (m,st,Raise e)
+                  (DerefF _)     -> case e of
+                                      (L l) -> let v = access n m
+                                               in case v of
+                                                    Nothing -> E (m,st,Raise e)
+                                                    Just v' -> R (m,ss,v')
+                                      _     -> E (m,st,Raise e)
+                  (SeqF  _ e2)   -> case e of
+                                      Void  -> E (m,ss,e2)
+                                      _     -> E (m,st,Raise e)
+                  (AddFL () e2)
+                    | isValue e -> E (m,(AddFR e ()):ss, e2)
+                    | otherwise -> E (m,st,Raise e)
+                  (AddFR e1 ())
+                    | isValue e -> case (e,e2) of
+                                     (I n1,I n2) -> R (m,ss,I (n1 + n2))
+                                     (I _ ,_   ) -> E (m,st,Raise e2)
+                                     _           -> E (m,st,Raise e)
+                         (Assig e1 e2)  -> case e1 of
                                         (L n)     -> case e2 of
                                                        (I _)    -> validateUpdate (n, e2) m
                                                        (B _)    -> validateUpdate (n, e2) m
@@ -41,26 +122,8 @@ eval1 (m, expr) = case expr of
                                                                       Nothing -> error $ "Invalid assignation: the address" ++ show n ++ "  hasn't been allocated in the memory: " ++ show m
                                                                       Just m' -> (m', Void) 
                                         _         -> let (m', e1') = eval1 (m, e1)
-                                                     in  (m', Assig e1' e2)
-                    (Alloc e)      -> case e of
-                                        (I _)    -> allocate e m
-                                        (B _)    -> allocate e m
-                                        (V _)    -> allocate e m
-                                        (L _)    -> allocate e m
-                                        (Fn _ _) -> allocate e m
-                                        _        -> let (m', e') = eval1 (m, e)
-                                                    in  (m', Alloc e')
-                      where
-                        allocate :: Expr -> Memory -> (Memory, Expr)
-                        allocate e m = let (L l) = newAddress m
-                                       in (insertBy (\x y -> compare (fst x) (fst y)) (l, e) m, L l)
-                    (Deref e)      -> case e of
-                                        (L n) -> let v = access n m
-                                                 in case v of
-                                                      Nothing -> error $ "Invalid assignation: the address" ++ show n ++ "  hasn't been allocated in the memory: " ++ show m
-                                                      Just v' -> (m, v')
-                                        _     -> let (m', e') = eval1 (m, e)
-                                                 in  (m', Deref e')
+                                                     in  (m', Assig e1' e2
+
                     (Let id e1 e2) -> case e1 of
                                         (I _)     -> (m, subst e2 (id, e1))
                                         (B _)     -> (m, subst e2 (id, e1))
@@ -79,19 +142,7 @@ eval1 (m, expr) = case expr of
                                                         in  (m', App e1 e2')
                                        | otherwise   -> let (m', e1') = eval1 (m, e1)
                                                         in  (m', App e1' e2)
-                    (Succ e)       -> case e of
-                                        (I i)  -> (m, I (i + 1))
-                                        _      -> let (m', e') = eval1 (m, e)
-                                                  in  (m', Succ e')
-                    (Pred e)       -> case e of
-                                        (I i)  -> (m, I (i - 1))
-                                        _      -> let (m', e') = eval1 (m, e)
-                                                  in  (m', Pred e')
-                    (Not  e)       -> case e of
-                                        (B b)  -> (m, B (not b))
-                                        _      -> let (m', e') = eval1 (m, e)
-                                                  in  (m', Not e')
-                    (Add e1 e2)    -> case e1 of
+                    (Add () e2)    -> case e1 of
                                         (I i1) -> case e2 of
                                                     (I i2) -> (m, I (i1 + i2))
                                                     _      -> let (m', e2') = eval1 (m, e2)
@@ -149,9 +200,7 @@ eval1 (m, expr) = case expr of
                                         (B False) -> (m, e3)
                                         _         -> let (m', e1') = eval1 (m, e1)
                                                      in  (m', If e1' e2 e3)
-                    (Fn id e)      -> let (m', e') = eval1 (m, e)
-                                      in  (m', Fn id e')
-                    _              -> error $ "Couldn't apply eval1 to <" ++ show m ++ ", " ++ show expr ++ "> because it's blocked."
+
 
 
 -- Devuelve la transición tal que evals e = e’ syss e →∗ e' y e' está bloqueado
