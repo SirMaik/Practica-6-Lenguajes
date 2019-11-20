@@ -1,0 +1,21 @@
+//Example of a program of iterative maximum common divisor function.
+
+let mcd := fn m => fn n => let x := alloc m in
+    	      	      	       let y := alloc n in
+    	     		       	    let r := alloc m in  
+    	      	      	       	    	(while not (!y = 0) do
+			       	     		r ::= !x;
+				     		(while ((!r > !y) | (!r = !y)) do
+				     	   	       r ::= !r + (!y * (-1))
+				     		end);	       
+				     		x ::= !y;
+    	      	      	   	 		y ::= !r
+					end);
+					!x
+				     end
+				  end
+			      end
+in
+   mcd $ 12 $ 44
+end :: Integer
+

@@ -1,0 +1,5 @@
+//Example of a program with a constant function that adds 2 to a given number.
+
+let add2 := recurFn add2 n => n + 2 in
+    add2 $ 5
+end :: Integer

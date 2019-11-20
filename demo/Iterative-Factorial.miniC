@@ -1,0 +1,14 @@
+//Example of a program of iterative factorial function.
+
+let fac := fn n => let x := alloc n in
+                     let y := alloc 1 in
+                       (while (!x > 0) do
+                         y ::= !x * !y;
+                         x ::= pred !x
+                        end);
+                       !y
+                     end
+                   end
+in
+  fac $ 5
+end :: Integer
