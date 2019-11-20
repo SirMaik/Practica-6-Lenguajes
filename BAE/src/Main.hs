@@ -1,6 +1,5 @@
 import BAE.Parser as Parser
 import BAE.Dynamic as Dynamic
-import BAE.Static as Static
 import BAE.Sintax as Sintax
 import BAE.Type as Type
 import Data.List
@@ -53,5 +52,5 @@ main = do
       putStrLn "Evaluation:"
       -- putStrLn $ show (eval e t)
       -- POR AHORA NO VERIFICA EL TIPADO.
-      putStrLn $ show (evale e)
+      putStrLn $ show (eval e)
     _ -> putStrLn "Error: Invalid file name."

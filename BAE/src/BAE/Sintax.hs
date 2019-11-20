@@ -51,7 +51,7 @@ data Expr =  V Identifier | I Int | B Bool
           | Deref Expr
           | Assig Expr Expr
           | Seq   Expr Expr
-          | While Expr Expr 
+          | While Expr Expr
           --Excepciones
           | Raise  Expr
           | Handle Expr Identifier Expr
@@ -68,7 +68,7 @@ instance Show Frame where
              PredF        _  -> "pred"  ++ showUnary
              NotF         _  -> "not"   ++ showUnary
              RaiseF       _  -> "raise" ++ showUnary
-             AllocF       _  -> "alloc"   ++ showUnary
+             AllocF       _  -> "alloc" ++ showUnary
              DerefF       _  -> "deref" ++ showUnary
              AddFR      e1 _ -> "add" ++ showBinaryR e1
              AddFL      _ e2 -> "add" ++ showBinaryL e2
@@ -120,8 +120,8 @@ instance Show Expr where
              (Succ  e') -> "succ" ++ showUnary e'
              (Pred  e') -> "pred" ++ showUnary e'
              (Not   e') -> "not"  ++ showUnary e'
-             (Alloc e)  -> "alloc " ++ show e
-             (Deref e)  -> '!':(show e)
+             (Alloc e')  -> "alloc " ++ show e'
+             (Deref e')  -> '!':(show e')
              (Raise e') -> "raise" ++ showUnary e'
              (Cont  p)  -> "cont"  ++ showStack p
              --Aridad 2
@@ -136,8 +136,8 @@ instance Show Expr where
              (While    e1 e2) -> "while" ++ showBinary e1 e2
              (Assig    e1 e2) -> (show e1) ++ " := " ++ show e2
              (App      e1 e2) -> "app"   ++ showBinary e1 e2
-             (Fn       x  e') -> "fn("      ++ x ++ "." ++ (show e) ++ ")"
-             (LetCC    x  e') -> "letcc("   ++ x ++ "." ++ (show e) ++ ")"
+             (Fn       x  e') -> "fn("      ++ x ++ "." ++ (show e') ++ ")"
+             (LetCC    x  e') -> "letcc("   ++ x ++ "." ++ (show e') ++ ")"
              (Continue e1 e2) -> "continue" ++ showBinary e1 e2
              --Aridad 3
              (If     e1 e2 e3) -> "if("  ++ (show e1) ++ "," ++ (show e2) ++ "," ++ (show e3) ++ ")"
@@ -236,15 +236,15 @@ subst expr s@(x, r) = let subst' = flip subst s
                              | otherwise -> expr
                            (I _) -> expr
                            (B _) -> expr
-                           --L{} -> expr
+                           (L _) -> expr
                            --Aridad 1
                            (Succ  e) -> Succ  (subst' e)
                            (Pred  e) -> Pred  (subst' e)
                            (Not   e) -> Not   (subst' e)
                            (Raise e) -> Raise (subst' e)
                            (Cont  _) -> expr
-                           --(Alloc e) -> Alloc (subst' e)
-                           --(Deref e) -> Deref (subst' e)
+                           (Alloc e) -> Alloc (subst' e)
+                           (Deref e) -> Deref (subst' e)
                            --Aridad 2
                            (Add      e1 e2)  -> Add      (subst' e1) (subst' e2)
                            (Mul      e1 e2)  -> Mul      (subst' e1) (subst' e2)
@@ -253,7 +253,7 @@ subst expr s@(x, r) = let subst' = flip subst s
                            (Lt       e1 e2)  -> Lt       (subst' e1) (subst' e2)
                            (Gt       e1 e2)  -> Gt       (subst' e1) (subst' e2)
                            (Eq       e1 e2)  -> Eq       (subst' e1) (subst' e2)
-                           --(Assig e1 e2)  -> Assig  (subst' e1) (subst' e2)
+                           (Assig    e1 e2)  -> Assig    (subst' e1) (subst' e2)
                            (Seq      e1 e2)  -> Seq      (subst' e1) (subst' e2)
                            (While    e1 e2)  -> While    (subst' e1) (subst' e2)
                            (App      e1 e2)  -> App      (subst' e1) (subst' e2)
@@ -271,12 +271,11 @@ subst expr s@(x, r) = let subst' = flip subst s
                              | x == id               -> Let id (subst' e1) e2
                              | id `elem` frVars r    -> subst' (alphaExpr expr)
                              | otherwise             -> Let id (subst' e1) (subst' e2)
-                           
                            (Handle e1 id e2)
                              | x == id               -> Handle (subst' e1) id e2
                              | id `elem` (frVars r)  -> subst' (alphaExpr expr)
                              | otherwise             -> Handle (subst' e1) id (subst' e2)
-                           (If  e1 e2 e3)     -> If     (subst' e1) (subst' e2) (subst' e3)
+                           (If  e1 e2 e3)            -> If     (subst' e1) (subst' e2) (subst' e3)
 
                            
 

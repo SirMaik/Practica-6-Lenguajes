@@ -1,4 +1,4 @@
-module BAE.Dynamic (Type, State, normal, eval1, evals, eval) where
+module BAE.Dynamic where
 
 import BAE.Sintax
 import BAE.Memory
@@ -28,31 +28,33 @@ normal e = case e of
 
 --Función que dice si una expresión es valor o no
 isValue :: Expr -> Bool
-isValue (Fn _ _) = True
-isValue (I  _)   = True
-isValue (B  _)   = True
-isValue (V  _)   = True
-isValue (L  _)   = True
-isValue (Void)   = True
-isValue _        = False
+isValue e@(Fn _ _) = normal e
+isValue (I  _)     = True
+isValue (B  _)     = True
+isValue (V  _)     = True
+isValue (L  _)     = True
+isValue (Void)     = True
+isValue _          = False
 
 --Función que dice si una expresión es una función
-isFn :: Expr -> Bool
-isFn (Fn _ _) = True
-isFn _        = False
+--isFn :: Expr -> Bool
+--isFn (Fn _ _) = True
+--isFn _        = False
 
 --Devuelve la transición tal que eval1 e = e' syss e -> e'
 eval1 :: State -> State
 eval1 (E (m,s,e))
-  | isValue e && (not . isFn) e = R (m,s,e)
+  | isValue e   = R (m,s,e)
   | otherwise   = case e of
-                    (Succ  e')    -> E (m, (SuccF  ()):s,e')
-                    (Pred  e')    -> E (m, (PredF  ()):s,e')
-                    (Not   e')    -> E (m, (NotF   ()):s,e')
-                    (Raise e')    -> E (m, (RaiseF ()):s,e')
-                    (Alloc e')    -> E (m, (AllocF ()):s,e')
-                    (Deref e')    -> E (m, (DerefF ()):s,e')
-                    (Fn id e')    -> E (m, (FnF id ()):s,e')
+                    (Fn id e')
+                      | normal e   -> R (m, s, e)
+                      | otherwise  -> E (m, (FnF id ()):s,e')
+                    (Succ  e')     -> E (m, (SuccF  ()):s,e')
+                    (Pred  e')     -> E (m, (PredF  ()):s,e')
+                    (Not   e')     -> E (m, (NotF   ()):s,e')
+                    (Raise e')     -> E (m, (RaiseF ()):s,e')
+                    (Alloc e')     -> E (m, (AllocF ()):s,e')
+                    (Deref e')     -> E (m, (DerefF ()):s,e')
                     (Add       e1 e2) -> E (m, (AddFL      () e2):s, e1)
                     (Mul       e1 e2) -> E (m, (MulFL      () e2):s, e1)
                     (And       e1 e2) -> E (m, (AndFL      () e2):s, e1)
@@ -76,7 +78,7 @@ eval1 (R (m,st@(s:ss),e))
   | otherwise         = case s of
                             (RaiseF _)     -> P (m,ss,Raise e) 
                             (SuccF  _)     -> case e of
-                                                (I n) -> R (m,st,I (n+1))
+                                                (I n) -> R (m,ss,I (n+1))
                                                 _     -> P (m,ss,Raise e)
                             (PredF  _)     -> case e of
                                                 (I n)
