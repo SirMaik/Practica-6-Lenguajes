@@ -13,6 +13,7 @@ module BAE.Parser
 , Type(..)
 , TExpr(..)
 , parseFile
+  , parseString
 ) where
 
   import Control.Monad

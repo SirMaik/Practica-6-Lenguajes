@@ -21,7 +21,7 @@ data Frame = SuccF      Pending      | PredF        Pending
            | LtFL       Pending Expr | LtFR         Expr   Pending
            | GtFL       Pending Expr | GtFR         Expr   Pending
            | EqFL       Pending Expr | EqFR         Expr   Pending
-           | AppFL      Pending Expr | AppFR        Expr   Pending
+           | AppFL      Pending Expr -- | AppFR        Expr   Pending
            | AssigFL    Pending Expr | AssigFR      Expr   Pending
            | ContinueFL Pending Expr | ContinueFR   Expr Pending
            | SeqF       Pending Expr
@@ -84,9 +84,9 @@ instance Show Frame where
              EqFL       _ e2 -> "eq"  ++ showBinaryL e2
              LtFR       e1 _ -> "lt"  ++ showBinaryR e1
              LtFL       _ e2 -> "lt"  ++ showBinaryL e2
-             AppFR      e1 _ -> "app" ++ showBinaryR e1
+             --AppFR      e1 _ -> "app" ++ showBinaryR e1
              AppFL      _ e2 -> "app" ++ showBinaryL e2
-             AssigFR    e1 _ -> "assig" ++ showBinaryR e1
+             --AssigFR    e1 _ -> "assig" ++ showBinaryR e1
              AssigFL    _ e2 -> "assig" ++ showBinaryL e2
              ContinueFR e1 _ -> "continue" ++ showBinaryR e1
              ContinueFL _ e2 -> "continue" ++ showBinaryL e2
@@ -123,7 +123,7 @@ instance Show Expr where
              (Alloc e')  -> "alloc " ++ show e'
              (Deref e')  -> '!':(show e')
              (Raise e') -> "raise" ++ showUnary e'
-             (Cont  p)  -> "cont"  ++ showStack p
+             (Cont  p)  -> "cont["  ++ showStack p ++ "]"
              --Aridad 2
              (Seq e1 e2)      -> (show e1) ++ ";" ++ (show e2)
              (Add e1 e2)      -> "add"   ++ showBinary e1 e2
@@ -287,66 +287,6 @@ infixr 1 <-> --Asocia a la derecha ya que &&, || asocian a la derecha y su prior
 (<->) _     _     = False
 -- Función que regresa true si dos expresiones son alfa equivalentes, falso en otro caso.
 alphaEq :: Expr -> Expr -> Bool
-alphaEq (Cont s1)   (Cont s2) = alphaEqCont (reverse s1) (reverse s2) [] 
-  where
-    --Se checarán si dos continuaciones son alfa equivalente. Para hacer esto primero se calculó la reversa para ir
-    --"del exterior al "al interior". A parte de recibir carga con una lista de restricciones que guarda pares de
-    --identificadores. Si el par es (x,y) esto especifica que x y y deben de ser equivalentes,
-    --o sea, encontrarse en los mismos lugares de los marcos.
-    --Se tomó la decisión de cargar con esta lista para no tener que redefinir sust para marcos. 
-    alphaEqCont :: Stack -> Stack -> [(Identifier, Identifier)] ->  Bool
-    alphaEqCont []     []     _ = True
-    alphaEqCont []     (_:_)  _ = False
-    alphaEqCont (_:_)  []     _ = False
-    alphaEqCont (a:as) (b:bs) s = case (a,b) of                 
-                                    (SuccF{} ,SuccF{})     -> alphaEqTail
-                                    (PredF{} ,PredF{})     -> alphaEqTail
-                                    (NotF{}  ,NotF{} )     -> alphaEqTail
-                                    (RaiseF{},RaiseF{})    -> alphaEqTail
-                                    (AllocF{},AllocF{})    -> alphaEqTail
-                                    (DerefF{},DerefF{})    -> alphaEqTail
-                                    (AddFR       a1 _ , AddFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (AddFL       _  a2, AddFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (MulFR       a1 _ , MulFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (MulFL       _  a2, MulFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (AndFR       a1 _ , AndFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (AndFL       _  a2, AndFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (OrFR        a1 _ , OrFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (OrFL        _  a2, OrFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (LtFR        a1 _ , LtFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (LtFL        _  a2, LtFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (GtFR        a1 _ , GtFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (GtFL        _  a2, GtFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (EqFR        a1 _ , EqFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (EqFL        _  a2, EqFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (AppFR       a1 _ , AppFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (AppFL       _  a2, AppFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (AssigFR     a1 _ , AssigFR     b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (AssigFL     _  a2, AssigFL     _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (ContinueFR  a1 _ , ContinueFR  b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
-                                    (ContinueFL  _  a2, ContinueFL  _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (SeqF        _  a2, SeqF        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
-                                    (FnF         x  _ , FnF         y  _ )
-                                      | x == y       -> alphaEqTail
-                                      | otherwise    -> alphaEqCont as bs ((x,y):s) 
-                                    (LetF      x _  a2, LetF     y _  b2)
-                                      | x == y       -> alphaEqTail
-                                      | otherwise    -> let s' = ((x,y):s)
-                                                        in (verify a2 b2) && (alphaEq a2 (adjust b2 s')) && alphaEqCont as bs ((x,y):s') 
-                                    (HandleF   _ x  a2, HandleF  _ y  b2)
-                                      | x == y       -> alphaEqTail
-                                      | otherwise    -> let s' = ((x,y):s)
-                                                        in (verify a2 b2) && (alphaEq a2 (adjust b2 s')) && alphaEqCont as bs ((x,y):s') 
-                                    (IfF       _ a2 a3, IfF      _ b2 b3)  -> (verify a2 b2) && (verify a3 b3) && (alphaEq a2 (adjust b2 s)) && (alphaEq a3 (adjust b3 s)) && alphaEqTail
-                                    _                                      -> False
-      where
-        alphaEqTail  = alphaEqCont as bs s 
-        --Verifica usando la lista de restricciones
-        verify a b = foldr (\(x,y) acc -> ((not(x `elem` frVars b) && (y `notElem` frVars a) ||  (x `elem` frVars b) && (y `notElem` frVars a)) && acc)) True s           
-        --Hace las sustituciones en la segunda pila
-        adjust :: Expr -> [(Identifier, Identifier)]-> Expr
-        adjust e []     = e
-        adjust e ((x,y):ss) = adjust (subst e (y, V x)) ss
 alphaEq (Fn  x a)    (Fn  y b)
   | x == y                                        = alphaEq a b
   | (x `elem` frVars b) && (y `notElem` frVars a) = False 
@@ -386,6 +326,7 @@ alphaEq (Not   a)           (Not   b)      = alphaEq a b
 alphaEq (Raise a)           (Raise b)      = alphaEq a b
 alphaEq (Deref a)           (Deref b)      = alphaEq a b
 alphaEq (Alloc a)           (Alloc b)      = alphaEq a b
+alphaEq (Cont     c1   )    (Cont  c2   )  = c1 == c2
 alphaEq (Add      a1 a2)    (Add   b1 b2)  = alphaEq a1 b1 && alphaEq a2 b2
 alphaEq (Mul      a1 a2)    (Mul   b1 b2)  = alphaEq a1 b1 && alphaEq a2 b2
 alphaEq (And      a1 a2)    (And   b1 b2)  = alphaEq a1 b1 && alphaEq a2 b2
@@ -402,5 +343,67 @@ alphaEq (If    a1 a2 a3) (If    b1 b2 b3)  = alphaEq a1 b1 && alphaEq a2 b2 && a
 alphaEq _ _ = False
 
 
+
+--Intento de definir la alfa equivalenciad de continuaciones:
+--alphaEq (Cont s1)   (Cont s2) = alphaEqCont (reverse s1) (reverse s2) [] 
+--  where
+    --Se checarán si dos continuaciones son alfa equivalente. Para hacer esto primero se calculó la reversa para ir
+    --"del exterior al "al interior". A parte se carga con una lista de restricciones que guarda pares de
+    --identificadores. Si el par es (x,y) esto especifica que x y y deben de ser equivalentes,
+    --o sea, deben de encontrarse a la misma altura y marcos de las pilas
+    --Se tomó la decisión de cargar con esta lista para no tener que redefinir sust para marcos. 
+--    alphaEqCont :: Stack -> Stack -> [(Identifier, Identifier)] ->  Bool
+--    alphaEqCont []     []     _ = True
+--    alphaEqCont []     (_:_)  _ = False
+--    alphaEqCont (_:_)  []     _ = False
+--    alphaEqCont (a:as) (b:bs) s = case (a,b) of                 
+--                                    (SuccF{} ,SuccF{})     -> alphaEqTail
+--                                    (PredF{} ,PredF{})     -> alphaEqTail
+--                                    (NotF{}  ,NotF{} )     -> alphaEqTail
+--                                    (RaiseF{},RaiseF{})    -> alphaEqTail
+--                                    (AllocF{},AllocF{})    -> alphaEqTail
+--                                    (DerefF{},DerefF{})    -> alphaEqTail
+--                                    (AddFR       a1 _ , AddFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (AddFL       _  a2, AddFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (MulFR       a1 _ , MulFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (MulFL       _  a2, MulFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (AndFR       a1 _ , AndFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (AndFL       _  a2, AndFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (OrFR        a1 _ , OrFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (OrFL        _  a2, OrFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (LtFR        a1 _ , LtFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (LtFL        _  a2, LtFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (GtFR        a1 _ , GtFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (GtFL        _  a2, GtFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (EqFR        a1 _ , EqFR        b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (EqFL        _  a2, EqFL        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+                                    --(AppFR       a1 _ , AppFR       b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (AppFL       _  a2, AppFL       _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (AssigFR     a1 _ , AssigFR     b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (AssigFL     _  a2, AssigFL     _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (ContinueFR  a1 _ , ContinueFR  b1 _ ) -> (verify a1 b1) && (alphaEq a1 (adjust b1 s)) && alphaEqTail
+--                                    (ContinueFL  _  a2, ContinueFL  _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (SeqF        _  a2, SeqF        _  b2) -> (verify a2 b2) && (alphaEq a2 (adjust b2 s)) && alphaEqTail
+--                                    (FnF         x  _ , FnF         y  _ )
+--                                      | x == y       -> alphaEqTail
+--                                      | otherwise    -> alphaEqCont as bs ((x,y):s) 
+--                                    (LetF      x _  a2, LetF     y _  b2)
+--                                      | x == y       -> alphaEqTail
+--                                      | otherwise    -> let s' = ((x,y):s)
+--                                                        in (verify a2 b2) && (alphaEq a2 (adjust b2 s')) && alphaEqCont as bs ((x,y):s') 
+--                                    (HandleF   _ x  a2, HandleF  _ y  b2)
+--                                      | x == y       -> alphaEqTail
+--                                      | otherwise    -> let s' = ((x,y):s)
+--                                                        in (verify a2 b2) && (alphaEq a2 (adjust b2 s')) && alphaEqCont as bs ((x,y):s') 
+--                                    (IfF       _ a2 a3, IfF      _ b2 b3)  -> (verify a2 b2) && (verify a3 b3) && (alphaEq a2 (adjust b2 s)) && (alphaEq a3 (adjust b3 s)) && alphaEqTail
+--                                    _                                      -> False
+--      where
+--        alphaEqTail  = alphaEqCont as bs s 
+--        --Verifica usando la lista de restricciones
+--        verify a b = foldr (\(x,y) acc -> ((not(x `elem` frVars b) && (y `notElem` frVars a) ||  (x `elem` frVars b) && (y `notElem` frVars a)) && acc)) True s      
+--        --Hace las sustituciones en la segunda pila
+--        adjust :: Expr -> [(Identifier, Identifier)]-> Expr
+--        adjust e []     = e
+--        adjust e ((x,y):ss) = adjust (subst e (y, V x)) ss
 --Nota: Bajo esta implementación de alphaEq y subst hay que verificar que la interacción
 --      entre Cont P y ambas funciones es correcta.

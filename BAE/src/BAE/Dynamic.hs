@@ -20,15 +20,16 @@ instance Show State where
 --Determina si una expresión lambda está en forma normal. 
 normal :: Expr -> Bool
 normal e = case e of
-             Fn id a  -> normal a
+             Fn id a -> normal a
              App a b -> case a of
                           Fn _ _     -> False
-                          otherwise  -> normal a && normal b
+                          otherwise  -> normal a
              _       -> True
 
 --Función que dice si una expresión es valor o no
 isValue :: Expr -> Bool
-isValue e@(Fn _ _) = normal e
+isValue e@(Fn _ _) = True
+isValue (Cont _)   = True
 isValue (I  _)     = True
 isValue (B  _)     = True
 isValue (V  _)     = True
@@ -46,9 +47,7 @@ eval1 :: State -> State
 eval1 (E (m,s,e))
   | isValue e   = R (m,s,e)
   | otherwise   = case e of
-                    (Fn id e')
-                      | normal e   -> R (m, s, e)
-                      | otherwise  -> E (m, (FnF id ()):s,e')
+                    (Fn id e')     -> E (m, (FnF id ()):s,e')
                     (Succ  e')     -> E (m, (SuccF  ()):s,e')
                     (Pred  e')     -> E (m, (PredF  ()):s,e')
                     (Not   e')     -> E (m, (NotF   ()):s,e')
@@ -71,7 +70,7 @@ eval1 (E (m,s,e))
                     (Handle e1 id e2) -> E (m, (HandleF () id e2):s, e1)
                     (While    e1 e2)  -> E (m, s, If e1 (Seq e2 e) Void)
                     (LetCC  id e   )  -> E (m, s, subst e (id, Cont s))
-eval1 (R (m,[],e))        = R (m,[],Raise e)    
+eval1 (R (m,[],e))        = P (m,[],Raise e)    
 eval1 (R (m,st@(s:ss),e))
   --El siguiente caso sólo se da si se llama con argumentos incompatibles a eval1
   | (not . isValue) e = E (m,(RaiseF ()):st,e)
@@ -138,10 +137,12 @@ eval1 (R (m,st@(s:ss),e))
                                                            (I n2) -> R (m,ss,B (n1 == n2))
                                                            _      -> P (m,ss,Raise e)
                                                _      -> P (m,ss,Raise e1)
-                            (AppFL () e2) -> E (m,(AppFR e ()):ss, e2)
-                            (AppFR e1 ()) -> case e1 of
-                                               (Fn id f) -> E (m,ss,subst f (id, e))
-                                               _         -> P (m,ss,Raise e1)
+                            (AppFL () e2) -> case e of
+                                               (Fn id f) -> E (m,ss,subst f (id,e2))
+                                               _         -> P (m,ss,Raise e)
+                            --(AppFR e1 ()) -> case e1 of
+                            --                   (Fn id f) -> E (m,ss,subst f (id, e))
+                            --                   _         -> P (m,ss,Raise e1)
                             (SeqF  _ e2)  -> case e of
                                                 Void  -> E (m,ss,e2)
                                                 _     -> P (m,ss,Raise e)
@@ -163,12 +164,10 @@ eval1 (R (m,st@(s:ss),e))
                                                     _         -> P (m, ss, Raise e)
                             (LetF id () e2)    -> E (m,ss, subst e2 (id, e))
                             (HandleF () _ _)   -> R (m,ss,e)
-eval1 (P (m,[],e)) = P ([],[],Void) --Esto es para contemprar todos los casos evitando que se cicle el programa. Este caso nunca debería de ocurrir ya que evals parará justamente al encontrarlo.
---A continuación se hace el pattern matching directo con Raise .. ya que es el único que "detona" P.
 eval1 (P (m,(s:ss),e@(Raise e')))  = case s of
                                        (HandleF () id e2) -> E (m, ss, subst e2 (id, e'))
                                        _                  -> P (m, ss,e)
-eval1 _ =  P ([],[],Void) --Lo mismo que el primer caso
+eval1 _ =  P ([],[],Void) -- <- Esto nunca debería de suceder
 
 
 -- Devuelve la transición tal que evals e = e’ syss e →∗ e' y e' está bloqueado
@@ -191,15 +190,16 @@ evals state = case state of
 -- Devuelve la evaluación de un programa tal que evale e = e’ syss e →∗ e' y e'
 -- es un valor. En caso de que e' no esa un valor deberá mostrar un mensaje
 -- de error particular del operador que lo causó
-eval :: Expr -> Expr
-eval e = case evals (E ([],[],e)) of
+evale :: Expr -> Expr
+evale e = case evals (E ([],[],e)) of
             (R (_,[],e'))
               | isValue e' -> e'
-              | otherwise  -> error $ "The resulting expression " ++ (show e') ++ " is not a value."
-            (P (_,[],Raise(e'))) -> error $ "Exception " ++ (show e') ++ "raised."
+              | otherwise  -> error "Error." --error $ "The resulting expression " ++ (show e') ++ " is not a value."
+            (P (_,[],Raise(e'))) -> error "Error." --error $ "Exception " ++ (show e') ++ " raised."
             _ -> error "Error." 
               
 
-
-
+evalN :: State -> Int -> State
+evalN s 0 = s
+evalN s i = evalN (eval1 s) (i - 1)
   

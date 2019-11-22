@@ -52,5 +52,5 @@ main = do
       putStrLn "Evaluation:"
       -- putStrLn $ show (eval e t)
       -- POR AHORA NO VERIFICA EL TIPADO.
-      putStrLn $ show (eval e)
+      putStrLn $ show (evale e)
     _ -> putStrLn "Error: Invalid file name."
